@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ULI Security Document Validator - RBIH</title>
+    
+    <!-- Load PDF.js library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    
+    <!-- Load Tesseract.js OCR library for scanned PDFs -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #ce5441 0%, #e67361 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px auto;
+            display: block;
+        }
+        
+        .header-content {
+            margin: 0 auto;
+        }
+        
+        .header h1 {
+            color: #ce5441;
+            font-size: 2.2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #64748b;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: #ce5441;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #ce5441;
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #ce5441;
+        }
+        
+        .doc-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 968px) {
+            .doc-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; text-align: center; }
+        }
+        
+        .doc-box {
+            border: 3px solid #e5e7eb;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+        
+        .doc-box:hover {
+            border-color: #ce5441;
+            background: #fff5f3;
+            transform: translateY(-2px);
+        }
+        
+        .doc-box.selected {
+            border-color: #ce5441;
+            background: #ffe8e5;
+            border-width: 4px;
+        }
+        
+        .doc-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .doc-name {
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 1.05em;
+        }
+        
+        .upload-section {
+            border: 4px dashed #ce5441;
+            padding: 40px;
+            text-align: center;
+            border-radius: 12px;
+            background: #fff5f3;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        
+        .upload-section:hover {
+            background: #ffe8e5;
+            border-color: #b84838;
+        }
+        
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+        
+        input[type="file"] {
+            display: block;
+            margin: 15px auto;
+            padding: 10px;
+            font-size: 16px;
+        }
+        
+        .file-info {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .processing {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+            border-left: 4px solid #3b82f6;
+            text-align: center;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .btn-validate {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #ce5441 0%, #e67361 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(206, 84, 65, 0.3);
+        }
+        
+        .btn-validate:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .btn-validate:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(206, 84, 65, 0.4);
+        }
+        
+        .requirements {
+            background: #fef3c7;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #f59e0b;
+            margin: 20px 0;
+        }
+        
+        .requirements h3 {
+            color: #92400e;
+            margin-bottom: 12px;
+        }
+        
+        .requirements ul {
+            margin-left: 20px;
+            color: #78350f;
+        }
+        
+        .requirements li {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+        
+        .results {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .results.show { display: block; }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .status-badge {
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .status-pass { background: #d1fae5; color: #065f46; }
+        .status-fail { background: #fee2e2; color: #991b1b; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .summary-card {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .summary-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        
+        .summary-label {
+            color: #64748b;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .check {
+            border-left: 5px solid #e5e7eb;
+            padding: 18px;
+            margin: 12px 0;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        
+        .check.pass { border-left-color: #10b981; }
+        .check.fail { border-left-color: #ef4444; }
+        .check.warning { border-left-color: #f59e0b; }
+        .check.critical { border-left-color: #ce5441; border-left-width: 8px; }
+        
+        .check-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .check-icon { font-size: 1.5em; }
+        
+        .check-title {
+            font-weight: bold;
+            color: #1e293b;
+            flex: 1;
+        }
+        
+        .check-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .check-badge.pass { background: #d1fae5; color: #065f46; }
+        .check-badge.fail { background: #fee2e2; color: #991b1b; }
+        .check-badge.warning { background: #fef3c7; color: #92400e; }
+        .check-badge.critical { background: #ce5441; color: white; }
+        
+        .check-msg {
+            color: #475569;
+            margin-left: 42px;
+            line-height: 1.6;
+        }
+        
+        .critical-alert {
+            background: #fee2e2;
+            border: 2px solid #ce5441;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .critical-alert h3 {
+            color: #991b1b;
+            margin-bottom: 10px;
+        }
+        
+        .critical-alert p {
+            color: #7f1d1d;
+            line-height: 1.6;
+        }
+        
+        .btn-reset {
+            width: 100%;
+            padding: 15px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        
+        .btn-reset:hover {
+            background: #4b5563;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+        
+        .security-note {
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #ce5441;
+        }
+        
+        .security-note strong {
+            color: #ce5441;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="data:image/jpeg;base64,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" alt="RBIH Logo" class="logo">
+            <div class="header-content">
+                <h1>🔐 ULI Security Document Validator</h1>
+                <p>IP/URL Whitelisting - L1 Validation Tool</p>
+                <span class="badge">⚠️ ALL DOCUMENTS MANDATORY</span>
+            </div>
+        </div>
+
+        <div class="card" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid #ce5441;">
+            <h2 style="color: #ce5441; margin-bottom: 15px;">📘 How to Use This Tool</h2>
+            <div style="color: #475569; line-height: 1.8;">
+                <p style="margin-bottom: 12px;"><strong>Step 1:</strong> Select the type of document you want to validate (Anti-Malware Solution, Architecture Diagram, or VAPT Report)</p>
+                <p style="margin-bottom: 12px;"><strong>Step 2:</strong> Upload your document (PDF, DOCX, or TXT format)</p>
+                <p style="margin-bottom: 12px;"><strong>Step 3:</strong> Click "VALIDATE DOCUMENT" to check if it meets IFTAS requirements</p>
+                <p style="margin-bottom: 12px;"><strong>Step 4:</strong> Review the results - Green checkmarks indicate passed checks, red X marks show failures</p>
+                <div style="margin-top: 15px; padding: 12px; background: white; border-radius: 8px; border-left: 3px solid #10b981;">
+                    <strong style="color: #10b981;">💡 Pro Tip:</strong> The tool works completely offline in your browser. Your documents are never uploaded to any server - they stay 100% private on your computer!
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Step 1: Select Document Type</h2>
+            <div class="doc-grid">
+                <div class="doc-box" onclick="selectDoc('antimalware')">
+                    <div class="doc-icon">🛡️</div>
+                    <div class="doc-name">Anti-Malware Solution</div>
+                </div>
+                <div class="doc-box" onclick="selectDoc('architecture')">
+                    <div class="doc-icon">📐</div>
+                    <div class="doc-name">Architecture Diagram</div>
+                </div>
+                <div class="doc-box" onclick="selectDoc('vapt')">
+                    <div class="doc-icon">🔍</div>
+                    <div class="doc-name">VAPT Report</div>
+                </div>
+            </div>
+            
+            <div id="requirements" class="requirements" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+            <h2>Step 2: Upload Document</h2>
+            <div class="upload-section">
+                <div class="upload-icon">📤</div>
+                <div style="font-size: 1.3em; font-weight: bold; margin-bottom: 10px;">
+                    Click to Upload Document
+                </div>
+                <div style="color: #64748b;">Supports: PDF, DOCX, TXT (Includes OCR for Scanned PDFs 🔍✨)</div>
+                <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt">
+            </div>
+            <div class="file-info" id="fileInfo"></div>
+            <div class="processing" id="processing">
+                <span class="spinner"></span>
+                <strong>Processing PDF...</strong> Extracting text from document
+            </div>
+            
+            <div class="security-note">
+                <strong>🔒 Privacy & Security:</strong> All documents are processed locally in your browser. 
+                No data is uploaded to any server. Your documents remain 100% private and secure on your computer.<br><br>
+                <strong>✨ Enhanced PDF Support with OCR:</strong> Automatically detects and processes scanned PDFs using OCR (Optical Character Recognition). Works with both text-based and image-based PDF files.
+            </div>
+            
+            <button class="btn-validate" id="validateBtn" disabled onclick="validate()">
+                🔍 VALIDATE DOCUMENT
+            </button>
+        </div>
+
+        <div class="results" id="results"></div>
+        
+        <div class="footer">
+            <div>Reserve Bank Innovation Hub (RBIH)</div>
+            <div style="margin-top: 5px; opacity: 0.9;">ULI Platform - Security Document Validation Tool</div>
+        </div>
+    </div>
+
+    <script>
+        let selectedType = null;
+        let selectedFile = null;
+        let fileContent = null;
+
+        // Complete validation rules
+        const RULES = {
+            vapt: {
+                name: "VAPT Report",
+                requirements: [
+                    "FULL comprehensive report by CERT-IN empaneled auditor",
+                    "Application VA/PT for apps connecting with ULI",
+                    "Must include BOTH VA and PT",
+                    "Risk Summary Table (Risk Level, Impact, Status)",
+                    "All vulnerabilities listed including LOW (with closure)",
+                    "Valid for ONE YEAR for permanent whitelisting",
+                    "Must NOT be older than 6 months from submission",
+                    "Clear report - Low findings NOT acceptable if impact is high",
+                    "Must match source module technical details"
+                ],
+                checks: [
+                    {
+                        name: "CERT-IN Empaneled Auditor",
+                        critical: true,
+                        validate: (txt) => {
+                            const hasCert = /(CERT.*IN|empaneled|certified|auditor|assessor)/i.test(txt);
+                            const hasCreds = /(CEH|OSCP|CISSP|CISA|CREST)/i.test(txt);
+                            return {
+                                pass: hasCert || hasCreds,
+                                msg: hasCert || hasCreds
+                                    ? "✓ Auditor credentials/certification mentioned"
+                                    : "✗ CRITICAL: CERT-IN empaneled auditor not verified"
+                            };
+                        }
+                    },
+                    {
+                        name: "Report Date (Within 6 Months)",
+                        critical: true,
+                        validate: (txt) => {
+                            // Get current date
+                            const now = new Date();
+                            const currentYear = now.getFullYear();
+                            const currentMonth = now.getMonth(); // 0-11
+                            
+                            // Look for date patterns in the report
+                            const datePattern = /(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/gi;
+                            const matches = txt.match(datePattern);
+                            
+                            if (!matches || matches.length === 0) {
+                                return {
+                                    pass: false,
+                                    msg: "✗ CRITICAL: Cannot find report date in document"
+                                };
+                            }
+                            
+                            // Parse the most recent date found
+                            const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                                              'july', 'august', 'september', 'october', 'november', 'december'];
+                            
+                            let oldestAge = 999;
+                            let reportDateStr = '';
+                            
+                            matches.forEach(dateStr => {
+                                const parts = dateStr.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(\w+)\s+(\d{4})/i);
+                                if (parts) {
+                                    const month = monthNames.findIndex(m => m === parts[2].toLowerCase());
+                                    const year = parseInt(parts[3]);
+                                    
+                                    // Calculate age in months
+                                    const ageInMonths = (currentYear - year) * 12 + (currentMonth - month);
+                                    
+                                    if (ageInMonths < oldestAge) {
+                                        oldestAge = ageInMonths;
+                                        reportDateStr = dateStr;
+                                    }
+                                }
+                            });
+                            
+                            const withinSixMonths = oldestAge <= 6;
+                            
+                            return {
+                                pass: withinSixMonths,
+                                msg: withinSixMonths
+                                    ? `✓ Report dated ${reportDateStr} (${oldestAge} months old)`
+                                    : `✗ CRITICAL: Report is ${oldestAge} months old (dated ${reportDateStr}). Must be within 6 months.`
+                            };
+                        }
+                    },
+                    {
+                        name: "Both VA and PT Included",
+                        critical: true,
+                        validate: (txt) => {
+                            // More strict detection - need explicit mentions of BOTH as separate activities
+                            
+                            // VA indicators
+                            const vaPatterns = [
+                                /vulnerability\s+assessment/i,
+                                /\bVA\b/,
+                                /vuln.*assess/i
+                            ];
+                            const hasVA = vaPatterns.some(p => p.test(txt));
+                            
+                            // PT indicators - must be explicit, not just "penetration testing" in title
+                            const ptPatterns = [
+                                /penetration\s+test(?:ing)?.*conducted/i,
+                                /\bPT\b.*conducted/i,
+                                /performed.*penetration.*test/i,
+                                /manual.*penetration/i,
+                                /exploit.*vulnerabilit/i,
+                                /PT.*VA|VA.*PT/i,  // Explicit mention of both together
+                                /VAPT/i  // Combined term
+                            ];
+                            const hasPT = ptPatterns.some(p => p.test(txt));
+                            
+                            // Also check if it's just "penetration testing" in type field only
+                            const onlyInTitle = /type.*audit.*penetration.*testing/i.test(txt) && !hasPT;
+                            
+                            return {
+                                pass: hasVA && hasPT,
+                                msg: hasVA && hasPT
+                                    ? "✓ Both VA and PT documented as separate activities"
+                                    : !hasVA && !hasPT
+                                        ? "✗ CRITICAL: Missing both VA and PT"
+                                        : !hasVA
+                                            ? "✗ CRITICAL: Missing Vulnerability Assessment (VA)"
+                                            : onlyInTitle
+                                                ? "✗ CRITICAL: Only mentions 'Penetration Testing' in title, no evidence of actual PT conducted. Appears to be VA only."
+                                                : "✗ CRITICAL: Missing Penetration Testing (PT) - only VA conducted"
+                            };
+                        }
+                    },
+                    {
+                        name: "Risk Summary Table",
+                        critical: true,
+                        validate: (txt) => {
+                            const hasTable = /(risk.*summary|summary.*table|vulnerability.*summary|risk.*count)/i.test(txt);
+                            const hasCritical = /critical/i.test(txt);
+                            const hasHigh = /high/i.test(txt);
+                            const hasMedium = /medium/i.test(txt);
+                            const hasLow = /low/i.test(txt);
+                            const allLevels = hasCritical && hasHigh && hasMedium && hasLow;
+                            const hasStatus = /(status|closed|open|resolved)/i.test(txt);
+                            
+                            const pass = (hasTable || allLevels) && hasStatus;
+                            
+                            return {
+                                pass: pass,
+                                msg: pass
+                                    ? `✓ Risk Summary Table complete (severity levels + status)`
+                                    : "✗ CRITICAL: Risk Summary Table incomplete or missing"
+                            };
+                        }
+                    },
+                    {
+                        name: "Low Findings Impact Check",
+                        critical: true,
+                        validate: (txt) => {
+                            // This check looks for LOW SEVERITY findings that are explicitly described as having HIGH IMPACT
+                            // Examples that SHOULD trigger:
+                            //   - "Low severity vulnerability with high impact"
+                            //   - "Severity: Low, Impact: High"
+                            //   - "Low risk finding but impact is high"
+                            // Examples that should NOT trigger:
+                            //   - "Overall rating: Low Risk" (this is overall assessment)
+                            //   - Table with "| Critical | High | Medium | Low |" columns
+                            //   - "2 HIGH severity issues and 10 LOW severity issues" (separate findings)
+                            
+                            const lines = txt.split('\n');
+                            let foundLowSeverityWithHighImpact = false;
+                            
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i];
+                                
+                                // Skip table headers and data rows entirely
+                                if (/critical.*high.*medium.*low|s#.*ip.*address|severity.*count/i.test(line)) continue;
+                                if (/\d+\s+\d+\s+\d+\s+\d+/.test(line)) continue;
+                                
+                                // Skip overall risk ratings (these are NOT findings)
+                                if (/overall.*low.*risk|rated.*low.*risk|rating.*low|risk.*rating.*low/i.test(line)) continue;
+                                if (/security.*posture.*low/i.test(line)) continue;
+                                
+                                // Look for explicit patterns where LOW severity is paired with HIGH impact
+                                // Pattern 1: "Severity: Low" + "Impact: High" in same sentence
+                                const pattern1 = /severity[\s:]*low.*impact[\s:]*high|impact[\s:]*high.*severity[\s:]*low/i.test(line);
+                                
+                                // Pattern 2: "Low severity" + "high impact" close together
+                                const pattern2 = /low[\s-]severity.*high[\s-]impact|high[\s-]impact.*low[\s-]severity/i.test(line);
+                                
+                                // Pattern 3: "Low risk" + "high impact" (when describing a specific finding)
+                                const pattern3 = /\blow[\s-]risk\b.*\bhigh[\s-]impact\b|\bhigh[\s-]impact\b.*\blow[\s-]risk\b/i.test(line);
+                                
+                                // Make sure it's actually describing a finding/vulnerability (not just mentioning concepts)
+                                const isFinding = /finding|vulnerability|issue|vuln|weakness|flaw/i.test(line);
+                                
+                                if ((pattern1 || pattern2 || (pattern3 && isFinding))) {
+                                    foundLowSeverityWithHighImpact = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Check if there's closure documentation
+                            const hasClosed = /(closed|resolved|mitigated|remediated|fixed|patched)/i.test(txt);
+                            
+                            return {
+                                pass: !foundLowSeverityWithHighImpact,
+                                msg: !foundLowSeverityWithHighImpact
+                                    ? "✓ No LOW severity findings with HIGH impact detected"
+                                    : "✗ CRITICAL: LOW severity finding(s) with HIGH impact - NOT ACCEPTABLE per IFTAS"
+                            };
+                        }
+                    },
+                    {
+                        name: "All Vulnerabilities Closed with Conclusion",
+                        critical: true,
+                        validate: (txt) => {
+                            // Check for explicit "Not Fixed: 0" or "Open: 0" patterns
+                            const notFixedZero = /(not\s+fixed[:\s]+0|open[:\s]+0)/i.test(txt);
+                            const allFixed = /(fixed[:\s]+\d+.*not\s+fixed[:\s]+0)/i.test(txt);
+                            
+                            // Check for distribution tables showing 100% closure
+                            const hasDistribution = /(status.*count|severity.*count)/i.test(txt);
+                            
+                            // Traditional closure indicators
+                            const closureWords = ['closed', 'resolved', 'mitigated', 'remediated', 'fixed'];
+                            const foundClosure = closureWords.filter(c => new RegExp(c, 'i').test(txt));
+                            
+                            const hasConclusion = /(conclusion|summary|clearance|final.*report|all.*vulnerabilities.*mitigated|all.*vulnerabilities.*closed)/i.test(txt);
+                            const hasPass = /(status.*pass|pass.*status)/i.test(txt);
+                            
+                            // More flexible passing conditions
+                            const pass = (
+                                (notFixedZero || allFixed) || // Explicit "Not Fixed: 0" or similar
+                                (foundClosure.length >= 2 && (hasConclusion || hasPass || hasDistribution)) // Traditional indicators
+                            );
+                            
+                            return {
+                                pass: pass,
+                                msg: pass
+                                    ? notFixedZero || allFixed
+                                        ? "✓ All vulnerabilities closed (0 not fixed/open)"
+                                        : `✓ All vulnerabilities closed ${hasConclusion ? 'with conclusion' : ''}`
+                                    : "✗ CRITICAL: All vulnerabilities must be closed with conclusion"
+                            };
+                        }
+                    },
+                    {
+                        name: "Source Module Technical Details Match",
+                        critical: true,
+                        validate: (txt) => {
+                            const tech = ['IP', 'URL', 'domain', 'server', 'application', 'API', 'endpoint', 'port', 'https://'];
+                            const found = tech.filter(t => {
+                                if (t === 'IP') return /\bIP\b|IP address/i.test(txt);
+                                if (t === 'https://') return /https?:\/\//i.test(txt);
+                                return new RegExp(t, 'i').test(txt);
+                            });
+                            
+                            return {
+                                pass: found.length >= 2,
+                                msg: found.length >= 2
+                                    ? `✓ Technical details present (${found.slice(0, 4).join(', ')})`
+                                    : "✗ CRITICAL: VAPT must match source module technical details (IPs/URLs connecting to ULI)"
+                            };
+                        }
+                    }
+                ]
+            },
+            antimalware: {
+                name: "Anti-Malware Solution",
+                requirements: [
+                    "MANDATORY for ANY source module integrated with ULI",
+                    "Report or detailed writeup of implemented solution",
+                    "Screenshots of anti-malware solution deployment",
+                    "Anti-ransomware controls demonstrated",
+                    "Required REGARDLESS of cloud/on-premise hosting",
+                    "Cloud-hosted: Justification on threat mitigation",
+                    "Must cover source module connecting to ULI"
+                ],
+                checks: [
+                    {
+                        name: "Anti-Malware Solution Documented",
+                        critical: true,
+                        validate: (txt) => {
+                            const antiMalwareTerms = [
+                                /anti[-\s]?malware/i,
+                                /antimalware/i,
+                                /malware.*protection/i,
+                                /malware.*defense/i,
+                                /endpoint.*protection/i,
+                                /endpoint.*security/i,
+                                /threat.*protection/i
+                            ];
+                            
+                            const hasSolution = antiMalwareTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasSolution,
+                                msg: hasSolution
+                                    ? "✓ Anti-malware solution documented"
+                                    : "✗ CRITICAL: Anti-malware solution not documented"
+                            };
+                        }
+                    },
+                    {
+                        name: "Anti-Ransomware Controls",
+                        critical: true,
+                        validate: (txt) => {
+                            const ransomwareTerms = [
+                                /ransomware/i,
+                                /anti[-\s]?ransomware/i,
+                                /ransomware.*protection/i,
+                                /ransomware.*defense/i,
+                                /ransomware.*control/i,
+                                /backup.*recovery/i,
+                                /file.*integrity/i
+                            ];
+                            
+                            const hasRansomware = ransomwareTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasRansomware,
+                                msg: hasRansomware
+                                    ? "✓ Anti-ransomware controls documented"
+                                    : "✗ CRITICAL: Anti-ransomware controls not documented (critical for SaaS)"
+                            };
+                        }
+                    },
+                    {
+                        name: "Solution Details/Writeup",
+                        critical: true,
+                        validate: (txt) => {
+                            const detailIndicators = [
+                                /implementation/i,
+                                /deployment/i,
+                                /configuration/i,
+                                /installed/i,
+                                /enabled/i,
+                                /activated/i,
+                                /running/i,
+                                /active/i
+                            ];
+                            
+                            const detailsFound = detailIndicators.filter(ind => ind.test(txt)).length;
+                            
+                            return {
+                                pass: detailsFound >= 2,
+                                msg: detailsFound >= 2
+                                    ? "✓ Solution implementation details documented"
+                                    : "✗ CRITICAL: Missing implementation details/writeup"
+                            };
+                        }
+                    },
+                    {
+                        name: "Screenshots/Evidence Provided",
+                        critical: false,
+                        validate: (txt) => {
+                            const evidenceTerms = [
+                                /screenshot/i,
+                                /screen.*shot/i,
+                                /image/i,
+                                /figure/i,
+                                /exhibit/i,
+                                /shown.*below/i,
+                                /as.*seen/i,
+                                /dashboard/i,
+                                /console/i
+                            ];
+                            
+                            const hasEvidence = evidenceTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasEvidence,
+                                msg: hasEvidence
+                                    ? "✓ Evidence/screenshots referenced"
+                                    : "⚠ No screenshot references found (recommended to include visual evidence)"
+                            };
+                        }
+                    },
+                    {
+                        name: "Cloud Justification (if applicable)",
+                        critical: false,
+                        validate: (txt) => {
+                            const isCloud = /(aws|azure|google.*cloud|gcp|cloud.*hosted|cloud.*infrastructure)/i.test(txt);
+                            
+                            if (!isCloud) {
+                                return { pass: true, msg: "✓ Not cloud-hosted (or not mentioned)" };
+                            }
+                            
+                            const hasJustification = /(threat.*mitigation|security.*measure|cloud.*security|external.*threat|firewall|waf|ddos)/i.test(txt);
+                            
+                            return {
+                                pass: hasJustification,
+                                msg: hasJustification
+                                    ? "✓ Cloud environment security measures documented"
+                                    : "⚠ Cloud hosting detected - should include threat mitigation justification"
+                            };
+                        }
+                    },
+                    {
+                        name: "Source Module Coverage",
+                        critical: true,
+                        validate: (txt) => {
+                            const sourceModuleTerms = [
+                                /source.*module/i,
+                                /application.*server/i,
+                                /production.*environment/i,
+                                /ULI.*integration/i,
+                                /connected.*system/i,
+                                /integrated.*application/i
+                            ];
+                            
+                            const hasSourceModule = sourceModuleTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasSourceModule,
+                                msg: hasSourceModule
+                                    ? "✓ Source module/application context mentioned"
+                                    : "✗ CRITICAL: Must specify source module connecting to ULI"
+                            };
+                        }
+                    }
+                ]
+            },
+            architecture: {
+                name: "Architecture Diagram",
+                requirements: [
+                    "Visual representation of application/network/data flow",
+                    "Includes CBS, LOS, LMS, and relevant systems accessing ULI",
+                    "CLEARLY highlights system integrating with ULI platform",
+                    "Shows source module communication with ULI environment",
+                    "Demonstrates how application interacts with ULI",
+                    "Writeup on data flow including all API interactions",
+                    "Explanation/justification of architecture"
+                ],
+                checks: [
+                    {
+                        name: "Diagram/Visual Representation",
+                        critical: true,
+                        validate: (txt) => {
+                            const diagramTerms = [
+                                /diagram/i,
+                                /architecture/i,
+                                /flow.*chart/i,
+                                /network.*topology/i,
+                                /system.*design/i,
+                                /visual.*representation/i,
+                                /schematic/i
+                            ];
+                            
+                            const hasDiagram = diagramTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasDiagram,
+                                msg: hasDiagram
+                                    ? "✓ Diagram/architecture documentation present"
+                                    : "✗ CRITICAL: Architecture diagram not found"
+                            };
+                        }
+                    },
+                    {
+                        name: "ULI Platform Integration Highlighted",
+                        critical: true,
+                        validate: (txt) => {
+                            const uliTerms = [
+                                /ULI.*platform/i,
+                                /ULI.*integration/i,
+                                /ULI.*connection/i,
+                                /connect.*ULI/i,
+                                /integrate.*ULI/i,
+                                /ULI.*API/i,
+                                /ULI.*environment/i
+                            ];
+                            
+                            const hasULI = uliTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasULI,
+                                msg: hasULI
+                                    ? "✓ ULI platform integration mentioned"
+                                    : "✗ CRITICAL: Must clearly highlight ULI platform integration"
+                            };
+                        }
+                    },
+                    {
+                        name: "Key Systems Documented",
+                        critical: true,
+                        validate: (txt) => {
+                            const systems = {
+                                'CBS': /(core.*banking|CBS)/i,
+                                'LOS': /(loan.*origination|LOS)/i,
+                                'LMS': /(loan.*management|LMS)/i,
+                                'Application': /(application|app|system|module)/i
+                            };
+                            
+                            const foundSystems = Object.keys(systems).filter(sys => systems[sys].test(txt));
+                            
+                            return {
+                                pass: foundSystems.length >= 2,
+                                msg: foundSystems.length >= 2
+                                    ? `✓ Key systems documented (${foundSystems.join(', ')})`
+                                    : "✗ CRITICAL: Must include CBS/LOS/LMS or relevant systems"
+                            };
+                        }
+                    },
+                    {
+                        name: "Data Flow Documentation",
+                        critical: true,
+                        validate: (txt) => {
+                            const flowTerms = [
+                                /data.*flow/i,
+                                /application.*flow/i,
+                                /network.*flow/i,
+                                /information.*flow/i,
+                                /request.*flow/i,
+                                /api.*flow/i
+                            ];
+                            
+                            const hasFlow = flowTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasFlow,
+                                msg: hasFlow
+                                    ? "✓ Data/application flow documented"
+                                    : "✗ CRITICAL: Data flow documentation missing"
+                            };
+                        }
+                    },
+                    {
+                        name: "API Interactions Documented",
+                        critical: true,
+                        validate: (txt) => {
+                            const apiTerms = [
+                                /\bAPI\b/i,
+                                /REST.*API/i,
+                                /web.*service/i,
+                                /endpoint/i,
+                                /API.*call/i,
+                                /API.*request/i,
+                                /API.*interaction/i
+                            ];
+                            
+                            const hasAPI = apiTerms.some(term => term.test(txt));
+                            
+                            return {
+                                pass: hasAPI,
+                                msg: hasAPI
+                                    ? "✓ API interactions documented"
+                                    : "✗ CRITICAL: API interactions must be documented"
+                            };
+                        }
+                    },
+                    {
+                        name: "Communication/Integration Explained",
+                        critical: true,
+                        validate: (txt) => {
+                            const commTerms = [
+                                /communication/i,
+                                /integration/i,
+                                /connectivity/i,
+                                /connection/i,
+                                /interact/i,
+                                /exchange/i,
+                                /transmit/i,
+                                /send.*receive/i
+                            ];
+                            
+                            const commFound = commTerms.filter(term => term.test(txt)).length;
+                            
+                            return {
+                                pass: commFound >= 2,
+                                msg: commFound >= 2
+                                    ? "✓ Communication/integration explained"
+                                    : "✗ CRITICAL: Must explain how source module communicates with ULI"
+                            };
+                        }
+                    },
+                    {
+                        name: "Writeup/Explanation Provided",
+                        critical: false,
+                        validate: (txt) => {
+                            const writeupIndicators = [
+                                /description/i,
+                                /explanation/i,
+                                /overview/i,
+                                /detail/i,
+                                /justification/i,
+                                /rationale/i
+                            ];
+                            
+                            const hasWriteup = writeupIndicators.filter(ind => ind.test(txt)).length >= 2;
+                            
+                            return {
+                                pass: hasWriteup,
+                                msg: hasWriteup
+                                    ? "✓ Explanatory writeup/justification present"
+                                    : "⚠ Recommended: Include detailed explanation/justification"
+                            };
+                        }
+                    }
+                ]
+            }
+        };
+
+        function selectDoc(type) {
+            selectedType = type;
+            document.querySelectorAll('.doc-box').forEach(b => b.classList.remove('selected'));
+            event.target.closest('.doc-box').classList.add('selected');
+            
+            const rules = RULES[type];
+            const reqDiv = document.getElementById('requirements');
+            reqDiv.innerHTML = `
+                <h3>📋 ${rules.name} - Requirements</h3>
+                <ul>${rules.requirements.map(r => `<li>${r}</li>`).join('')}</ul>
+            `;
+            reqDiv.style.display = 'block';
+            
+            updateBtn();
+        }
+
+        // Enhanced PDF text extraction using PDF.js
+        // Enhanced PDF text extraction with OCR support for scanned PDFs
+        async function extractPDFText(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                
+                let fullText = '';
+                let isScanned = false;
+                
+                // First, try normal text extraction
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
+                }
+                
+                // Check if extracted text is insufficient (likely scanned PDF)
+                const cleanText = fullText.trim();
+                if (cleanText.length < 100) {
+                    console.log('Insufficient text detected - PDF appears to be scanned. Starting OCR...');
+                    isScanned = true;
+                    
+                    // Update UI to show OCR is running
+                    document.getElementById('processing').innerHTML = `
+                        <span class="spinner"></span>
+                        <strong>🔍 Scanned PDF Detected - Running OCR...</strong>
+                        <div style="margin-top: 10px; font-size: 0.9em; color: #64748b;">
+                            Processing page <span id="ocrProgress">1</span> of ${pdf.numPages}
+                            <br>This may take 10-30 seconds per page
+                        </div>
+                    `;
+                    
+                    // Perform OCR on each page
+                    fullText = await extractTextWithOCR(pdf);
+                }
+                
+                return fullText;
+            } catch (error) {
+                console.error('PDF extraction error:', error);
+                throw new Error('Failed to extract text from PDF');
+            }
+        }
+
+        // OCR extraction function for scanned PDFs
+        async function extractTextWithOCR(pdf) {
+            let ocrText = '';
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                try {
+                    // Update progress
+                    const progressEl = document.getElementById('ocrProgress');
+                    if (progressEl) progressEl.textContent = i;
+                    
+                    // Get page
+                    const page = await pdf.getPage(i);
+                    
+                    // Render page to canvas
+                    const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    
+                    // Run OCR on canvas
+                    const { data: { text } } = await Tesseract.recognize(
+                        canvas,
+                        'eng',
+                        {
+                            logger: m => {
+                                if (m.status === 'recognizing text') {
+                                    console.log(`OCR Page ${i}: ${Math.round(m.progress * 100)}%`);
+                                }
+                            }
+                        }
+                    );
+                    
+                    ocrText += text + '\n';
+                    
+                } catch (pageError) {
+                    console.error(`OCR failed for page ${i}:`, pageError);
+                    ocrText += `[OCR failed for page ${i}]\n`;
+                }
+            }
+            
+            return ocrText;
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            selectedFile = e.target.files[0];
+            if (!selectedFile) return;
+            
+            document.getElementById('fileInfo').innerHTML = `
+                <strong>📄 ${selectedFile.name}</strong><br>
+                Size: ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+            `;
+            document.getElementById('fileInfo').style.display = 'block';
+            
+            // Check if it's a PDF
+            const isPDF = selectedFile.name.toLowerCase().endsWith('.pdf');
+            
+            if (isPDF) {
+                // Show processing message
+                document.getElementById('processing').style.display = 'block';
+                document.getElementById('validateBtn').disabled = true;
+                
+                try {
+                    // Extract text from PDF using PDF.js
+                    fileContent = await extractPDFText(selectedFile);
+                    
+                    document.getElementById('processing').style.display = 'none';
+                    document.getElementById('fileInfo').innerHTML += `
+                        <br><strong style="color: #059669;">✓ PDF text extracted successfully (${fileContent.length} characters)</strong>
+                    `;
+                } catch (error) {
+                    document.getElementById('processing').style.display = 'none';
+                    document.getElementById('fileInfo').innerHTML += `
+                        <br><strong style="color: #dc2626;">✗ Failed to extract PDF text</strong>
+                    `;
+                    alert('Failed to extract text from PDF. Please ensure it is a valid, non-encrypted PDF.');
+                    fileContent = null;
+                }
+            } else {
+                // For non-PDF files, use regular FileReader
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    fileContent = e.target.result;
+                };
+                reader.readAsText(selectedFile);
+            }
+            
+            updateBtn();
+        });
+
+        function updateBtn() {
+            const canValidate = selectedType && selectedFile && fileContent;
+            document.getElementById('validateBtn').disabled = !canValidate;
+        }
+
+        function validate() {
+            if (!fileContent || fileContent.length < 50) {
+                alert('⚠️ Cannot validate - insufficient text extracted.\n\nPlease ensure:\n• PDF is text-based (not scanned image)\n• File is not corrupted or encrypted');
+                return;
+            }
+
+            const rules = RULES[selectedType];
+            const results = rules.checks.map(check => {
+                const result = check.validate(fileContent);
+                return { name: check.name, critical: check.critical, ...result };
+            });
+
+            displayResults(rules.name, results);
+        }
+
+        function displayResults(docName, results) {
+            const passed = results.filter(r => r.pass).length;
+            const failed = results.filter(r => !r.pass).length;
+            const criticalFails = results.filter(r => !r.pass && r.critical).length;
+            
+            const status = criticalFails > 0 ? 'fail' : failed > 0 ? 'warning' : 'pass';
+            const statusText = criticalFails > 0 
+                ? `❌ ${criticalFails} CRITICAL FAILURES` 
+                : failed > 0 
+                    ? `⚠️ ${failed} Issues Found`
+                    : '✅ All Checks Passed';
+
+            let html = `
+                <div class="result-header">
+                    <h2 style="margin:0;">${docName}</h2>
+                    <span class="status-badge status-${status}">${statusText}</span>
+                </div>
+
+                <div class="summary">
+                    <div class="summary-card">
+                        <div class="summary-value" style="color:#10b981;">${passed}</div>
+                        <div class="summary-label">Passed</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" style="color:#ef4444;">${failed}</div>
+                        <div class="summary-label">Failed</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" style="color:#ce5441;">${criticalFails}</div>
+                        <div class="summary-label">Critical</div>
+                    </div>
+                </div>
+            `;
+
+            results.forEach(r => {
+                const st = !r.pass ? (r.critical ? 'critical' : 'fail') : 'pass';
+                const icon = !r.pass ? '❌' : '✅';
+                const badge = !r.pass ? (r.critical ? 'CRITICAL' : 'FAILED') : 'PASSED';
+                
+                html += `
+                    <div class="check ${st}">
+                        <div class="check-header">
+                            <span class="check-icon">${icon}</span>
+                            <span class="check-title">${r.name}</span>
+                            <span class="check-badge ${st}">${badge}</span>
+                        </div>
+                        <div class="check-msg">${r.msg}</div>
+                    </div>
+                `;
+            });
+
+            if (criticalFails > 0) {
+                html += `
+                    <div class="critical-alert">
+                        <h3>⚠️ CRITICAL FAILURES DETECTED</h3>
+                        <p>This document has <strong>${criticalFails} critical failure(s)</strong> and will be <strong>REJECTED by IFTAS</strong>.</p>
+                        <p><strong>Action Required:</strong> Address all critical issues before submission. Remember - <strong>ALL documents are MANDATORY</strong> and lack of any document will halt the overall integration.</p>
+                    </div>
+                `;
+            }
+
+            html += '<button class="btn-reset" onclick="reset()">🔄 Validate Another Document</button>';
+
+            document.getElementById('results').innerHTML = html;
+            document.getElementById('results').classList.add('show');
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function reset() {
+            selectedType = null;
+            selectedFile = null;
+            fileContent = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('processing').style.display = 'none';
+            document.getElementById('requirements').style.display = 'none';
+            document.querySelectorAll('.doc-box').forEach(b => b.classList.remove('selected'));
+            document.getElementById('results').classList.remove('show');
+            updateBtn();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
