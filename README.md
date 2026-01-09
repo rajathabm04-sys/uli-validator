@@ -172,11 +172,9 @@ This tool is currently in **pilot phase** for ULI Platform lender onboarding.
 ### Roadmap
 
 🔮 **Coming Soon:**
-- Multi-language support
 - Batch validation (multiple files)
 - Export validation reports
 - Custom validation rules
-- API integration
 
 ---
 
